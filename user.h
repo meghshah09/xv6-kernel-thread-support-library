@@ -23,7 +23,9 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-
+void clone(void *);
+void join (int, int *, void **);
+void thread_exit(int);
 // ulib.c
 int stat(char*, struct stat*);
 char* strcpy(char*, char*);
