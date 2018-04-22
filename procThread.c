@@ -23,6 +23,7 @@ int procThread_create(void)
 void procThread_exit(int ret_val)
 {
     // add your implementation here ...
+    thread_exit(ret_val);
     
 }
 

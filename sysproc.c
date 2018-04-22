@@ -126,7 +126,7 @@ int sys_join(void){
 	if(argptr(2,(void*)&stack,sizeof(void**)) < 0)
 		return -1;
 
-	//join(tid,(int*)ret_val,stack);
+	join(id,(int*)ret_val,stack);
 
 return 0;
 }
@@ -135,7 +135,7 @@ int sys_thread_exit(void){
   if(argint(0,&n)<0)
     return -1;
 
-  //thread_exit(n);
+  thread_exit(n);
   return 0;
 
 }

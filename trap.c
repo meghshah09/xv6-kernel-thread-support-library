@@ -82,6 +82,8 @@ trap(struct trapframe *tf)
   case T_PGFLT:
        proc->state = ZOMBIE;
       proc->killed =1;
+      proc->value = proc->tf->eax;
+      //cprintf("in trap value %x\n",proc->value);
     break;
 
   //PAGEBREAK: 13

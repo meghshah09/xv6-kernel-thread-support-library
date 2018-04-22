@@ -64,12 +64,12 @@ found:
   // which returns to trapret.
   sp -= 4;
   *(uint*)sp = (uint)trapret;
-
+  p->ref_count =1;
   sp -= sizeof *p->context;
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-
+  
   return p;
 }
 
@@ -207,23 +207,26 @@ int clone(void * stack){
   uint stack_size = *(uint*)proc->tf->ebp - proc->tf->esp;// size of stack
   //cprintf("Stack Size %d\n",stack_size);
   uint higherPart = *(uint*)proc->tf->ebp - proc->tf->ebp; // size above ebp
-
+  
   np->tf->esp = (uint)stack - stack_size; // new top of the stack(last item used on stack)
   //cprintf("np esp %d\n",np->tf->esp); // should be lowest memory adderss 
   np->tf->ebp = (uint)stack - higherPart;
   //cprintf("np ebp %d\n",np->tf->ebp); // should be higher memory adderss 
   // copy stack to child
-  memmove((void*) np->tf->esp, (void*) proc->tf->esp, stack_size); //(from old esp(proc) to new esp(np))
 
+  memmove((void*) np->tf->esp, (void*) proc->tf->esp, stack_size); //(from old esp(proc) to new esp(np))
+  //np->tf->ebp = proc->tf->ebp;
+  np->stack = stack;
   for(i = 0; i < NOFILE; i++)
     if(proc->ofile[i])
       np->ofile[i] = filedup(proc->ofile[i]);
   np->cwd = idup(proc->cwd);
 
   safestrcpy(np->name, proc->name, sizeof(proc->name));
- 
+  
   pid = np->pid;
-
+  np->ref_count = proc->ref_count;
+  np->ref_count = np->ref_count +1; 
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
@@ -272,12 +275,56 @@ exit(void)
     }
   }
 
+
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
   sched();
   panic("zombie exit");
 }
 
+void thread_exit(int ret_val)
+{
+struct proc *p;
+  int fd;
+
+  if(proc == initproc)
+    panic("init exiting");
+
+  // Close all open files.
+  for(fd = 0; fd < NOFILE; fd++){
+    if(proc->ofile[fd]){
+      fileclose(proc->ofile[fd]);
+      proc->ofile[fd] = 0;
+    }
+  }
+
+  begin_op();
+  iput(proc->cwd);
+  end_op();
+  //int * val = ;
+  //cprintf("ret_val : %x\n", ret_val);
+  proc->value = ret_val;
+  proc->cwd = 0;
+
+  acquire(&ptable.lock);
+
+  // Parent might be sleeping in wait().
+  wakeup1(proc->parent);
+
+  // Pass abandoned children to init.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->parent == proc){
+      p->parent = initproc;
+      if(p->state == ZOMBIE)
+        wakeup1(initproc);
+    }
+  }
+
+  // Jump into the scheduler, never to return.
+  proc->state = ZOMBIE;
+  sched();
+  panic("zombie exit");
+}
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
@@ -294,13 +341,13 @@ wait(void)
       if(p->parent != proc)
         continue;
       havekids = 1;
-      if(p->state == ZOMBIE){
+      if(p->state == ZOMBIE && p->ref_count ==1){
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
 
-        if(p->pgdir == proc->pgdir)
+        if(p->pgdir == proc->pgdir )
           freevm(p->pgdir);
         
         p->state = UNUSED;
@@ -317,6 +364,52 @@ wait(void)
     if(!havekids || proc->killed){
       release(&ptable.lock);
       return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(proc, &ptable.lock);  //DOC: wait-sleep
+  }
+}
+
+void join(int tid, int * ret_p, void ** stack ){
+  struct proc *p;
+  int havekids;
+
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for zombie children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if((p->parent != proc || (p->pgdir != proc->pgdir)))
+        continue;
+      havekids = 1;
+
+      if(p->state == ZOMBIE){
+        // Found one.
+        //pid = p->pid;
+        
+        kfree(p->kstack);
+        p->kstack = 0;
+        *ret_p = p->value;
+        //cprintf("ret_p value %x \n",ret_p);
+        p->state = UNUSED;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        
+        *stack = p->stack;
+        p->ref_count = p->ref_count - 1;  
+        release(&ptable.lock);
+        
+        return;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || proc->killed){
+      release(&ptable.lock);
+      return;
     }
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
