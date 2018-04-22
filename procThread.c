@@ -2,11 +2,21 @@
 #include "user.h"
 #include "procThread.h"
 
-
+void * stack;
 int procThread_create(void)
 {
     // add your implementation here ...
-    return -1;
+	 stack = malloc(4096);
+	int tid = clone(stack);
+	
+	//printf(1,"Tid is %d\n", tid);
+
+	if (tid >= 0){
+		return tid;
+	}
+	else{
+		return -1;
+	}
 }
 
 
@@ -20,6 +30,8 @@ void procThread_exit(int ret_val)
 void procThread_join(int tid, int * ret_val_p)
 {
     // add your implementation here ...
+    join(tid,ret_val_p,(void*)stack);
+    free(stack);
     
 }
 

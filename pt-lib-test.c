@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
             break;
         }
 
-    
+        
         case '2':
         {
             /***************************** TEST CASE 2 *********************************
@@ -432,7 +432,7 @@ int main(int argc, char *argv[])
         }
 
 
-
+        
         default:
             printf(1, "No such test case (%c).\n", argv[1][0]);
             usage(argv);

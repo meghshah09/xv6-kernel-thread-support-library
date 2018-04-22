@@ -23,7 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-void clone(void *);
+int clone(void *);
 void join (int, int *, void **);
 void thread_exit(int);
 // ulib.c

@@ -106,17 +106,36 @@ int sys_print_free_frame_cnt(void)
 }
 
 int sys_clone(void){
+	int stack;
+	if(argint(0,&stack) < 0)
+		return -1;
+
+	return clone((void *)stack);
 
 }
-int sys_join(void){
 
+int sys_join(void){
+	int id;
+	int ret_val;
+	void * stack;
+
+	if(argint(0,&id) < 0)
+		return -1;
+	if(argint(1,&ret_val) < 0)
+		return -1;
+	if(argptr(2,(void*)&stack,sizeof(void**)) < 0)
+		return -1;
+
+	//join(tid,(int*)ret_val,stack);
+
+return 0;
 }
 int sys_thread_exit(void){
   int n;
   if(argint(0,&n)<0)
     return -1;
 
-  thread_exit(n);
+  //thread_exit(n);
   return 0;
 
 }

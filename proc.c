@@ -166,6 +166,73 @@ fork(void)
   return pid;
 }
 
+//clone the thread context
+int clone(void * stack){
+  int i, pid;
+  struct proc *np;
+  uint * ustack;
+  /*  Stack grows downward from high memory to low memory
+      ESP points to the top of stack at any time.
+      when item poped increment the esp by (type)
+      when item pushed decrement the esp by (type)
+  */    
+  // check to see if stack allocated to 4096
+  if((uint)stack == 0){
+    return -1;
+  }
+
+  //if there is space left for more stack 
+  if((proc->sz - (uint)stack) < 4096) {
+    return -1;
+  }
+
+  // Allocate process.
+  if((np = allocproc()) == 0)
+    return -1;
+
+  
+  //int sp = (uint) stack + 4096 - 2*sizeof(int *); 
+  ustack = stack + 4096 - 2*sizeof(int *);
+  *ustack = 0xffffffff; // fake return PC
+  np->pgdir = proc->pgdir; // copy existing page table.
+  np->sz = proc->sz;
+  np->parent = proc;
+  *np->tf = *proc->tf;
+  
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0; // later on return value will be recorded from trap
+
+  //cprintf("proc esp %d\n",proc->tf->esp); // should be lowest memory adderss  
+  //cprintf("proc ebp %d\n",proc->tf->ebp); // should be higher memory adderss
+  uint stack_size = *(uint*)proc->tf->ebp - proc->tf->esp;// size of stack
+  //cprintf("Stack Size %d\n",stack_size);
+  uint higherPart = *(uint*)proc->tf->ebp - proc->tf->ebp; // size above ebp
+
+  np->tf->esp = (uint)stack - stack_size; // new top of the stack(last item used on stack)
+  //cprintf("np esp %d\n",np->tf->esp); // should be lowest memory adderss 
+  np->tf->ebp = (uint)stack - higherPart;
+  //cprintf("np ebp %d\n",np->tf->ebp); // should be higher memory adderss 
+  // copy stack to child
+  memmove((void*) np->tf->esp, (void*) proc->tf->esp, stack_size); //(from old esp(proc) to new esp(np))
+
+  for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+      np->ofile[i] = filedup(proc->ofile[i]);
+  np->cwd = idup(proc->cwd);
+
+  safestrcpy(np->name, proc->name, sizeof(proc->name));
+ 
+  pid = np->pid;
+
+  // lock to force the compiler to emit the np->state write last.
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
+  
+  return pid;
+  
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -198,7 +265,7 @@ exit(void)
 
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == proc){
+    if(p->parent == proc ){
       p->parent = initproc;
       if(p->state == ZOMBIE)
         wakeup1(initproc);
@@ -232,7 +299,10 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
+
+        if(p->pgdir == proc->pgdir)
+          freevm(p->pgdir);
+        
         p->state = UNUSED;
         p->pid = 0;
         p->parent = 0;
