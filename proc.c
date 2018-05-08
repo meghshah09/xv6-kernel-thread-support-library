@@ -198,6 +198,8 @@ int clone(void * stack){
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
+  stack = ustack;
+  np->stack =stack;
   //cprintf("SZ %d\n",proc->sz);
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0; // later on return value will be recorded from trap
@@ -217,7 +219,7 @@ int clone(void * stack){
   memmove((void*) np->tf->esp, (void*) proc->tf->esp, stack_size); //(from old esp(proc) to new esp(np))
   *(uint *)np->tf->ebp = np->tf->ebp + higherPart; // higherPart is the Offset
   //np->tf->ebp = proc->tf->ebp;
-  np->stack = stack;
+  
   for(i = 0; i < NOFILE; i++)
     if(proc->ofile[i])
       np->ofile[i] = filedup(proc->ofile[i]);
@@ -381,11 +383,11 @@ void join(int tid, int * ret_p, void ** stack ){
     // Scan through table looking for zombie children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if((p->parent != proc || (p->pgdir != proc->pgdir)))
+      if(p->parent != proc )
         continue;
       havekids = 1;
 
-      if(p->state == ZOMBIE){
+      if(p->state == ZOMBIE ){
         // Found one.
         //pid = p->pid;
         
@@ -393,6 +395,7 @@ void join(int tid, int * ret_p, void ** stack ){
         p->kstack = 0;
         *ret_p = p->value;
         //cprintf("ret_p value %x \n",ret_p);
+        //freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
         p->parent = 0;
