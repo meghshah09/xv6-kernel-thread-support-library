@@ -2,7 +2,8 @@
 #include "user.h"
 #include "procThread.h"
 
-void * stack;
+void *stack;
+
 int procThread_create(void)
 {
     // add your implementation here ...
@@ -17,6 +18,7 @@ int procThread_create(void)
 	else{
 		return -1;
 	}
+
 }
 
 
@@ -31,8 +33,7 @@ void procThread_exit(int ret_val)
 void procThread_join(int tid, int * ret_val_p)
 {
     // add your implementation here ...
-    join(tid,ret_val_p,(void*)stack);
-    free(stack);
     
+   join(tid,ret_val_p,(void*)stack);
+   free(stack);
 }
-

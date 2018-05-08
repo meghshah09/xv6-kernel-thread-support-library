@@ -168,7 +168,7 @@ fork(void)
 
 //clone the thread context
 int clone(void * stack){
-  int i, pid;
+   int i, pid;
   struct proc *np;
   uint * ustack;
   /*  Stack grows downward from high memory to low memory
@@ -198,7 +198,7 @@ int clone(void * stack){
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
-  
+  //cprintf("SZ %d\n",proc->sz);
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0; // later on return value will be recorded from trap
 
@@ -215,6 +215,7 @@ int clone(void * stack){
   // copy stack to child
 
   memmove((void*) np->tf->esp, (void*) proc->tf->esp, stack_size); //(from old esp(proc) to new esp(np))
+  *(uint *)np->tf->ebp = np->tf->ebp + higherPart; // higherPart is the Offset
   //np->tf->ebp = proc->tf->ebp;
   np->stack = stack;
   for(i = 0; i < NOFILE; i++)
@@ -400,6 +401,7 @@ void join(int tid, int * ret_p, void ** stack ){
         
         *stack = p->stack;
         p->ref_count = p->ref_count - 1;  
+        //kfree(*stack);
         release(&ptable.lock);
         
         return;
