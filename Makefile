@@ -174,7 +174,6 @@ UPROGS=\
 	_zombie\
 	_shutdown \
 	_pt-lib-test \
-	_test\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
